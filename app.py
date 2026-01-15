@@ -3,86 +3,79 @@ from ultralytics import YOLO
 from PIL import Image
 import cv2
 
-# --- 1. PAGE SETUP ---
-st.set_page_config(page_title="Traffic Sign Recognition", page_icon="🚦", layout="centered")
+# --- 1. PAGE CONFIG ---
+st.set_page_config(page_title="Traffic Sign AI", page_icon="🚦", layout="centered")
 
 st.title("🚦 Traffic Sign Recognition System")
-st.write("Upload a photo (even from a mobile screen), and AI will identify the sign and explain the rule.")
-st.markdown("---")
+st.markdown("### AI Traffic Assistant (Pro Version)")
+st.write("Upload a traffic sign image. Use the slider to adjust sensitivity.")
 
-# --- 2. LOAD MODEL ---
+# --- 2. SIDEBAR FOR ADJUSTMENTS (Ye naya feature hai) ---
+st.sidebar.header("⚙️ Settings")
+confidence_threshold = st.sidebar.slider("Model Sensitivity (Confidence)", 0.0, 1.0, 0.25, 0.05)
+st.sidebar.info("Tip: If the correct sign is not showing, lower the sensitivity slider.")
+
+# --- 3. LOAD MODEL ---
 @st.cache_resource
 def load_model():
     return YOLO('best.pt')
 
 model = load_model()
 
-# --- 3. MEANING DICTIONARY (English Explanations) ---
+# --- 4. MEANING DICTIONARY ---
 def get_sign_meaning(label):
     label = label.lower()
     if "stop" in label:
-        return "⚠️ STOP: You must bring your vehicle to a complete halt."
-    elif "speed" in label:
-        return "⚡ SPEED LIMIT: Do not exceed the speed limit displayed."
+        return "🛑 STOP: You must come to a complete halt."
     elif "left" in label:
-        return "⬅️ TURN LEFT: You must turn left ahead."
+        return "⬅️ TURN LEFT: Turn left ahead."
     elif "right" in label:
-        return "➡️ TURN RIGHT: You must turn right ahead."
+        return "➡️ TURN RIGHT: Turn right ahead."
+    elif "speed" in label or "limit" in label or "80" in label or "50" in label:
+        return "⚡ SPEED LIMIT: Do not exceed the displayed speed limit."
     elif "no" in label and "entry" in label:
-        return "⛔ NO ENTRY: Vehicles are not allowed to enter."
-    elif "yield" in label:
-        return "⚠️ YIELD: Give way to other vehicles."
+        return "⛔ NO ENTRY: Do not enter this road."
     elif "traffic" in label or "signal" in label:
-        return "🚦 TRAFFIC SIGNAL: Follow the traffic light colors."
-    elif "pedestrian" in label:
-        return "🚶 PEDESTRIAN CROSSING: Slow down and watch for people crossing."
+        return "🚦 TRAFFIC SIGNAL: Follow the traffic lights."
     else:
-        return "ℹ️ INFO: Follow the indicated traffic regulation."
+        return f"ℹ️ INFO: Follow the rules for '{label.upper()}'."
 
-# --- 4. INPUT SECTION ---
+# --- 5. MAIN APP ---
 uploaded_file = st.file_uploader("Upload Traffic Sign Image", type=['jpg', 'png', 'jpeg'])
 
 if uploaded_file is not None:
-    # A. Show User Image
     image = Image.open(uploaded_file)
-    st.image(image, caption='Original Input', use_container_width=True)
+    st.image(image, caption='Original Image', use_container_width=True)
     
-    st.markdown("### 🔍 AI Analysis Report")
+    st.markdown("---")
     
-    # B. Processing
-    with st.spinner('AI is scanning the image...'):
-        results = model(image)
-        
-        # C. Draw Boxes (Like your screenshot)
-        res_plotted = results[0].plot()
-        res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB) # Colors fix
-        st.image(res_rgb, caption='AI Detection Result', use_container_width=True)
-        
-        # D. List All Detections
-        detected = False
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                detected = True
+    # Run Prediction with Custom Confidence
+    results = model.predict(image, conf=confidence_threshold)
+    
+    # Display AI View
+    res_plotted = results[0].plot()
+    res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+    st.image(res_rgb, caption='AI Detection View', use_container_width=True)
+    
+    # Process Results
+    detected = False
+    st.markdown("### 📢 Detection Results:")
+    
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            detected = True
+            label = model.names[int(box.cls)]
+            confidence = float(box.conf) * 100
+            meaning = get_sign_meaning(label)
+            
+            # Show Result Card
+            with st.container():
+                st.markdown(f"#### ✅ Detected: **{label.upper()}**")
+                st.progress(int(confidence))
+                st.write(f"**Accuracy:** {confidence:.2f}%")
+                st.info(f"**Meaning:** {meaning}")
+                st.markdown("---")
                 
-                # Data Extraction
-                label = model.names[int(box.cls)]
-                confidence = float(box.conf) * 100
-                meaning = get_sign_meaning(label)
-                
-                # E. Final Output (Card Style)
-                with st.expander(f"Detected: {label.upper()} ({confidence:.1f}%)", expanded=True):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Sign Name", label.upper())
-                    with col2:
-                        st.metric("Accuracy", f"{confidence:.2f}%")
-                    
-                    st.info(f"**Action Required:** {meaning}")
-
-        if not detected:
-            st.warning("No traffic signs were detected in this image.")
-
-# Footer
-st.markdown("---")
-st.caption("AI Traffic Assistant | Powered by YOLOv8")
+    if not detected:
+        st.warning(f"No signs detected above {confidence_threshold*100}% accuracy. Try lowering the Sensitivity slider in the sidebar.")
