@@ -2,37 +2,30 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 
-# Page Config
+# 1. Page Setup
 st.set_page_config(page_title="AI Traffic Assistant", page_icon="🚦")
+st.title("🚦 Professional Traffic Sign Analyzer")
+st.write("Upload a traffic sign image to get a detailed AI report.")
 
-st.title("🚦 Smart Traffic Sign Analyzer")
-st.write("Upload a traffic sign, and the AI will explain its meaning and accuracy.")
-
-# 1. Sign Meanings (Customize these labels based on your best.pt classes)
-sign_explanations = {
-    "stop": "This sign indicates that you must come to a complete STOP.",
-    "turn right": "This sign tells you that you must TURN RIGHT ahead.",
-    "turn left": "This sign tells you that you must TURN LEFT ahead.",
-    "speed limit 30": "This sign indicates a maximum SPEED LIMIT of 30 km/h.",
-    "no entry": "This sign means NO ENTRY for vehicles in this direction.",
-    # Note: If your model names are different, change the keys above to match them.
-}
-
-# Load Model
+# 2. Load the Model
 @st.cache_resource
 def load_model():
     return YOLO('best.pt')
 
 model = load_model()
 
-# File Upload
-uploaded_file = st.file_uploader("Choose a traffic sign photo...", type=["jpg", "png", "jpeg"])
+# 3. File Upload
+uploaded_file = st.file_uploader("Upload Image (JPG, PNG, JPEG)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
+    # Display Image
     image = Image.open(uploaded_file)
-    st.image(image, caption='Uploaded Photo', use_container_width=True)
+    st.image(image, caption='Original Image', use_container_width=True)
     
     st.markdown("---")
+    st.subheader("🔍 AI Prediction & Analysis")
+    
+    # 4. Perform Detection
     results = model(image)
     
     detected = False
@@ -40,24 +33,20 @@ if uploaded_file is not None:
         boxes = result.boxes
         for box in boxes:
             detected = True
-            label = model.names[int(box.cls)].lower() # Get name from model
+            # Get detection data
+            label = model.names[int(box.cls)]
             confidence = float(box.conf) * 100
             
-            # --- DISPLAY RESULTS ---
-            st.subheader("📊 Analysis Results")
-            
-            # 1. Prediction Name
+            # --- DISPLAY BOX ---
             st.markdown(f"### **Prediction:** {label.upper()}")
+            st.markdown(f"### **Accuracy:** {confidence:.2f}%")
             
-            # 2. What it is saying (The Meaning)
-            meaning = sign_explanations.get(label, f"This sign is identified as {label.upper()}.")
-            st.info(f"💡 **What it means:** {meaning}")
-            
-            # 3. Accuracy
-            st.success(f"📈 **Accuracy (Confidence):** {confidence:.2f}%")
-            
-    if not detected:
-        st.error("No traffic sign detected. Please upload a clearer image.")
+            # --- WHAT IT IS SAYING (The Action) ---
+            st.info(f"💡 **Action Required:** This traffic sign is identified as a **{label.upper()}** sign. You should follow the rules indicated by this signal for road safety.")
 
+    if not detected:
+        st.warning("No traffic sign detected. Please upload a clearer image of a single traffic sign.")
+
+# Footer
 st.markdown("---")
-st.caption("Professional AI Recognition Project")
+st.caption("AI-Powered Traffic Vision System | 2026 Professional Version")
