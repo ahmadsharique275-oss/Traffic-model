@@ -1,80 +1,63 @@
 import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
-import os
 
-# --- PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="AI Traffic Sign Recognition",
-    page_icon="🚦",
-    layout="centered"
-)
+# Page Config
+st.set_page_config(page_title="AI Traffic Assistant", page_icon="🚦")
 
-# --- CUSTOM STYLING ---
-st.markdown("""
-    <style>
-    .main {
-        background-color: #f5f5f5;
-    }
-    .result-box {
-        padding: 20px;
-        border-radius: 10px;
-        background-color: #ffffff;
-        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-    }
-    </style>
-    """, unsafe_allow_html=True)
+st.title("🚦 Smart Traffic Sign Analyzer")
+st.write("Upload a traffic sign, and the AI will explain its meaning and accuracy.")
 
-# --- HEADER ---
-st.title("🚦 Traffic Sign Recognition System")
-st.write("A deep learning application to identify traffic signs with high precision.")
-st.markdown("---")
+# 1. Sign Meanings (Customize these labels based on your best.pt classes)
+sign_explanations = {
+    "stop": "This sign indicates that you must come to a complete STOP.",
+    "turn right": "This sign tells you that you must TURN RIGHT ahead.",
+    "turn left": "This sign tells you that you must TURN LEFT ahead.",
+    "speed limit 30": "This sign indicates a maximum SPEED LIMIT of 30 km/h.",
+    "no entry": "This sign means NO ENTRY for vehicles in this direction.",
+    # Note: If your model names are different, change the keys above to match them.
+}
 
-# --- MODEL LOADING ---
+# Load Model
 @st.cache_resource
-def load_trained_model():
-    model_path = 'best.pt'
-    if os.path.exists(model_path):
-        return YOLO(model_path)
-    else:
-        st.error(f"Error: '{model_path}' not found in the repository. Please ensure your model file is uploaded.")
-        return None
+def load_model():
+    return YOLO('best.pt')
 
-model = load_trained_model()
+model = load_model()
 
-# --- FILE UPLOAD SECTION ---
-uploaded_file = st.file_uploader("Upload a traffic sign image for analysis", type=["jpg", "jpeg", "png"])
+# File Upload
+uploaded_file = st.file_uploader("Choose a traffic sign photo...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # Load and display the image
     image = Image.open(uploaded_file)
-    st.image(image, caption='Uploaded Image', use_container_width=True)
+    st.image(image, caption='Uploaded Photo', use_container_width=True)
     
-    st.markdown("### Analysis Report")
+    st.markdown("---")
+    results = model(image)
     
-    if model is not None:
-        with st.spinner('Analyzing the image...'):
-            # Run Inference
-            results = model(image)
+    detected = False
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            detected = True
+            label = model.names[int(box.cls)].lower() # Get name from model
+            confidence = float(box.conf) * 100
             
-            detected = False
-            for result in results:
-                boxes = result.boxes
-                if len(boxes) > 0:
-                    detected = True
-                    for box in boxes:
-                        label = model.names[int(box.cls)]
-                        confidence = float(box.conf) * 100
-                        
-                        # --- PROFESSIONAL DISPLAY ---
-                        st.success(f"### Prediction: **{label.upper()}**")
-                        st.info(f"### Accuracy (Confidence): **{confidence:.2f}%**")
-                
-            if not detected:
-                st.warning("No traffic signs detected. Please try a clearer or closer image.")
-    else:
-        st.error("Model failed to load. Please check your GitHub files.")
+            # --- DISPLAY RESULTS ---
+            st.subheader("📊 Analysis Results")
+            
+            # 1. Prediction Name
+            st.markdown(f"### **Prediction:** {label.upper()}")
+            
+            # 2. What it is saying (The Meaning)
+            meaning = sign_explanations.get(label, f"This sign is identified as {label.upper()}.")
+            st.info(f"💡 **What it means:** {meaning}")
+            
+            # 3. Accuracy
+            st.success(f"📈 **Accuracy (Confidence):** {confidence:.2f}%")
+            
+    if not detected:
+        st.error("No traffic sign detected. Please upload a clearer image.")
 
-# --- FOOTER ---
 st.markdown("---")
-st.caption("AI-Powered Traffic Analysis Project | Powered by YOLOv8")
+st.caption("Professional AI Recognition Project")
